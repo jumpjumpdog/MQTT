@@ -1,9 +1,3 @@
-"""
-    The RESTFul resource of device
-
-    Author: Noah Gao
-    Updated at: 2018-02-23
-"""
 from flask import Response, abort
 from flask_restful import Resource, reqparse
 from flask_jwt_simple import jwt_required
