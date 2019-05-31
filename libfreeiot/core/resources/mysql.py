@@ -5,7 +5,7 @@ from flask_restful import Resource,reqparse
 from libfreeiot.core import mysql
 from libfreeiot.core.resources.tool import  adminQuery,  ownerQuery, addEqm, equipmentQuery,editEqm, deleteEqm, addOwner, \
     getOwnersByEqpId, normalInfo, getEqpsByOwnerId, deleteOwner, editOwner, getTHistory, generateExceptions, \
-    queryExceptions, handleException, getFixHisory
+    queryExceptions, handleException, getFixHisory, addException, login, arrangeException
 
 parser = reqparse.RequestParser()
 
@@ -67,6 +67,19 @@ class Mysql(Resource):
         elif 'getFixHisory' == action:
             print('getFixHisory function')
             return getFixHisory(data=args)
+        elif 'addException' == action:
+            print(args)
+            return addException(data=args)
+            print('addException function')
+        elif 'login' == action:
+            print(args)
+            print('login function')
+            return login(data=args)
+        elif 'arrangeException'== action:
+            print(args)
+            print('arrange exception')
+            return arrangeException(data=args)
+
         else:
             print("other function")
             return {}

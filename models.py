@@ -15,29 +15,10 @@ from sqlalchemy import Table
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from sqlalchemy.orm import scoped_session
 
-from datetime import datetime, date, timedelta
-
-from sqlalchemy.orm import sessionmaker
-
-def getUuid():
-    uuid_obj = uuid.uuid1()
-    uuid_str = str(uuid_obj)
-    return "".join(uuid_str.split("-"))
-
-engine = create_engine("mysql+pymysql://root:123@localhost:3306/mqttdb", max_overflow=5)
 
 Base = declarative_base()
-
-class DateEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, DateTime):
-            return obj.strftime('%Y-%m-%d %H:%M:%S')
-        elif isinstance(obj, date):
-            return obj.strftime("%Y-%m-%d")
-        else:
-            return json.JSONEncoder.default(self, obj)
-
 
 class Admin(Base):
     # 定义表名
@@ -59,6 +40,29 @@ class Admin(Base):
         if "_sa_instance_state" in dict:
             del dict["_sa_instance_state"]
         return dict
+
+from datetime import datetime, date, timedelta
+
+from sqlalchemy.orm import sessionmaker
+
+def getUuid():
+    uuid_obj = uuid.uuid1()
+    uuid_str = str(uuid_obj)
+    return "".join(uuid_str.split("-"))
+
+engine = create_engine("mysql+pymysql://root:123@localhost:3306/mqttdb", pool_size=100, pool_recycle=5, pool_timeout=30)
+session_factory = sessionmaker(bind=engine)
+session = scoped_session(session_factory)
+
+
+class DateEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, DateTime):
+            return obj.strftime('%Y-%m-%d %H:%M:%S')
+        elif isinstance(obj, date):
+            return obj.strftime("%Y-%m-%d")
+        else:
+            return json.JSONEncoder.default(self, obj)
 
 
 Owner_Equipment = Table(
@@ -101,18 +105,20 @@ class Equipment(Base):
     max_t = Column(Float)
     min_t = Column(Float)
     create_date = Column(DateTime)
+    url = Column(String(128))
 
 
     t_history = relationship('THistory', backref='equipment', lazy='dynamic')
     h_history = relationship('HHistory', backref='equipment', lazy='dynamic')
     owners = relationship("Owner",secondary=Owner_Equipment)
 
-    def __init__(self, _id, name, max_t, min_t,create_date, status='success'):
+    def __init__(self, _id, name, max_t, min_t,create_date,url, status='success'):
         self.id = _id
         self.name = name
         self.status = status
         self.max_t = max_t
         self.min_t = min_t
+        self.url = url
         if create_date is None:
             create_date = datetime.utcnow()
         self.create_date = create_date
@@ -121,7 +127,7 @@ class Equipment(Base):
         dict = self.__dict__
         mydict = {}
         for key in dict.keys():
-            if key == "_sa_instance_state" or key == "create_date" :
+            if key == "_sa_instance_state" or key == "create_date"  or key == 'owners' :
                 continue
             mydict[key] = dict[key]
         # if "_sa_instance_state" in dict:
@@ -163,13 +169,15 @@ class EquipmentException(Base):
     create_date =  Column(String(32))
     fix_date = Column(String(32))
     admin_id = Column(String(32))
-    def __init__(self,eqp_id,reason,create_date,status=None):
+    t = Column(String(32))
+    def __init__(self,eqp_id,reason,create_date,t ,status=None):
         self.eqp_id = eqp_id
         if status == None:
-            status ='待处理'
+            status ='待分配'
         self.status = status
         self.reason = reason
         self.create_date = create_date
+        self.t = t
 
     def to_json(self):
         dict = self.__dict__
@@ -207,8 +215,8 @@ class HHistory(Base):
 # equipemnt1 = Equipment()
 
 #创建mysql操作对象
-Session = sessionmaker(bind=engine)
-session = Session()
+# Session = sessionmaker(bind=engine)
+# session = Session()
 #
 # xinan1id = getUuid()
 # eqp = Equipment( _id=xinan1id,name='西南十洗衣房', max_t=30, min_t=-10,create_date=None, status='正常')

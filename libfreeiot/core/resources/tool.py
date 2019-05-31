@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import uuid
+
+from bson import json_util
+from flask import Response
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import or_
 
 from models import *
 
@@ -35,6 +39,7 @@ def ownerQuery():
     return {"result":True, "data":owner_list}
 
 def equipmentQuery():
+    session.commit()
     eqps = session.query(Equipment).all()
     eqp_list = []
     for eqp in eqps:
@@ -140,14 +145,39 @@ def deleteOwner(data):
 
 def normalInfo(data):
     try:
-        eqp_id= data["eqp_id"]
+        eqp_id= data["id"]
         eqp = session.query(Equipment).filter(Equipment.id==eqp_id).first()
         tdata = getTHistory(data)
-        return {"result": True,'data':eqp.to_json(),'tdata':tdata}
+        owners = getOwnersByEqpId2(data)
+        res_json = {"result": True,'data':eqp.to_json(),'tdata':tdata,'select_owners':owners[0],'owners':owners[1]}
+        return res_json
+    #     else:
+    #         return {"result": True,'data':eqp.to_json(),'tdata':tdata,'select_owners':owners['select_owners_list'],'owners':owners['all_owner_list']}
     except SQLAlchemyError as e:
         print('获取设备基本信息异常')
         print(str(e))
         return {"result": False}
+
+def getOwnersByEqpId2(data):
+    try:
+        eqp_id = data["id"]
+        eqp = session.query(Equipment).filter(Equipment.id == eqp_id).first()
+        all_owners = session.query(Owner).all()
+        all_owner_list = []
+        for owner in all_owners:
+            all_owner_list.append({'label': owner.name, 'value': owner.id})
+        if eqp is None:
+            return ( [],  all_owner_list)
+        else:
+            select_owners = list(eqp.owners)
+            select_owners_list = []
+            for owner in select_owners:
+                select_owners_list.append({'label': owner.name, 'value': owner.id})
+            return ( select_owners_list,  all_owner_list)
+    except SQLAlchemyError as e:
+        print('根据设备id 获取owners失败')
+        print(str(e))
+        return ([],[])
 
 def getOwnersByEqpId(data):
     try:
@@ -195,7 +225,7 @@ def getEqpsByOwnerId(data):
         return {"result": False}
 
 def getTHistory(data):
-    eqp_id = data['eqp_id']
+    eqp_id = data['id']
     print(data)
     ts = session.query(THistory).filter(THistory.equipment_id==eqp_id).order_by(THistory.create_date).all()
     print(len(ts))
@@ -211,13 +241,22 @@ def generateExceptions(data):
     print(t_histroy)
     return {"result": False}
 
+def getEqpById(id):
+    eqp = session.query(Equipment).filter(Equipment.id == id).first()
+    return eqp
+
 def queryExceptions():
-    exceptions = session.query(EquipmentException).filter(EquipmentException.status=='待处理').all()
-    exceptions = list(exceptions)
-    print(exceptions)
+    session.commit()
+    exceptions = session.query(EquipmentException).filter(or_(EquipmentException.status=='待处理' , EquipmentException.status=='待分配'))
     exception_list = []
     for exception in exceptions:
-        exception_list.append(exception.to_json())
+        tempJson = exception.to_json()
+        exception_list.append(tempJson)
+    for (index,exception) in enumerate(exception_list):
+        eqp = getEqpById(exception['eqp_id'])
+        exception_list[index]['name'] = eqp.name
+        exception_list[index]['owner_name'] =''
+    print(exception_list)
     return {'data':exception_list}
 
 
@@ -232,9 +271,67 @@ def handleException(data):
 
 
 def getFixHisory(data):
-    ower_id  = data['id']
-    exceptions =  session.query(EquipmentException).filter(EquipmentException.owner_id==ower_id).filter(EquipmentException.status=='已处理').all()
+    owner_id  = data['id']
+    exceptions =  session.query(EquipmentException).filter(EquipmentException.owner_id==owner_id).filter(EquipmentException.status=='已处理').all()
+    eqps = session.query(Owner).filter(Owner.id==owner_id).first().equipments
     fix_list = []
+    eqps_list = []
     for excep in exceptions:
         fix_list.append(excep.to_json())
-    return {'data':fix_list}
+    for eqp in eqps:
+        eqps_list.append({'label':eqp.name,'value':eqp.id})
+    return {'data':fix_list,'eqps':eqps_list}
+
+def addException(data):
+    eqp_id = data['id']
+    t = data['message']['temperature']['t']
+    create_date = data['create_date']
+    reason = data['reason']
+    try:
+        session.commit()
+        exception = EquipmentException(eqp_id=eqp_id, reason=reason, create_date=create_date,t = t)
+        session.add(exception)
+        session.commit()
+        return {"result":True}
+    except SQLAlchemyError as e:
+        print('添加异常失败')
+        print(str(e))
+        return {"result": False}
+
+def isNiceEqp(eqp_id):
+    eqp = session.query(Equipment).filter(or_(Equipment.status=='正常运行',Equipment.status=='设备异常')).filter(Equipment.id == eqp_id).first()
+    return eqp
+
+
+def isAdmin(data):
+    name = data['name']
+    password = data['password']
+    admin = session.query(Admin).filter(Admin.name == name).filter(Admin.password==password).first()
+    return admin
+
+def isOwner(data):
+    name = data['name']
+    password = data['password']
+    owner = session.query(Owner).filter(Owner.name==name).filter(Owner.password==password).first()
+    return  owner
+
+def login(data):
+    if(isAdmin(data)):
+        return {'userType':'admin'}
+    else:
+        return  {'userType':'owner'}
+
+
+def getOwnerById(ownerId):
+    return session.query(Owner).filter(Owner.id==ownerId).first()
+
+def arrangeException(data):
+    id = data['id']
+    owner_id = data['owner_id']
+    exp = session.query(EquipmentException).filter(EquipmentException.id == id).first()
+    exp.status = '待处理'
+    exp.owner_id = owner_id
+    owner = getOwnerById(owner_id)
+    res = {'owner_name':owner.name}
+    session.commit()
+    return res

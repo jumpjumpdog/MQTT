@@ -17,23 +17,21 @@ class MQTTAdapter(BaseAdapter):
 
     def run(self):
         """ Main Entry for Adapter """
-        # self.client = mqtt.Client("client",transport='websockets',clean_session=True)
-        # self.client.on_connect = self.on_connect
-        # self.client.on_message = self.on_message
-        # self.client.on_publish = self.on_publish
-        # self.client.on_subscribe = self.on_subscribe
-        # self.client.connect(self.server_address, self.server_port) # 连接服务器（TCP）
-        # # self.scope["mqt1tClient"] = self.client # 将 client 代入 Adapter 作用域
-        # self.client.loop_start()
-        # self.client.subscribe("temperature", qos=2)
-        # print('Hello from MQTTAdapter')
-        pass
-
-
+        self.client = mqtt.Client("client",transport='websockets',clean_session=True)
+        self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
+        self.client.on_publish = self.on_publish
+        self.client.on_subscribe = self.on_subscribe
+        self.client.connect(self.server_address, self.server_port) # 连接服务器（TCP）
+        # self.scope["mqt1tClient"] = self.client # 将 client 代入 Adapter 作用域
+        self.client.loop_start()
+        self.client.subscribe("temperature", qos=2)
+        print('Hello from MQTTAdapter')
 
     def on_connect(self, client, userdata, flags, rc):
+        pass
         """ Callback while conntected """
-        print("MQTT Broker connected with result code "+str(rc))
+        # print("MQTT Broker connected with result code "+str(rc))
         # Subscribing in on_connect() means that if we lose the connection and
         # reconnect then subscriptions will be renewed.
         # self.client.subscribe("humid")

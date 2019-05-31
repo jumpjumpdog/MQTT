@@ -6,5 +6,5 @@ from libfreeiot.adapters.mqtt import MQTTAdapter
 from libfreeiot.adapters.file import FileAdapter
 
 if __name__ == '__main__':
-    app.run(adapters = [ MQTTAdapter(), FileAdapter() ])
-    # app.run()
+    # app.run(adapters = [ MQTTAdapter(), FileAdapter() ])
+    app.run()

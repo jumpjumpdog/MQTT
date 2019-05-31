@@ -4,6 +4,8 @@ from bson import json_util
 from flask import request, jsonify, Response
 from flask_restful import Api
 from flask_jwt_simple import JWTManager, create_jwt
+
+from libfreeiot.core.resources.tool import isNiceEqp
 from .resources.device import Device
 from .resources.data import Data
 from .resources.mysql import Mysql
@@ -35,6 +37,12 @@ def create_routes(app, scope = None):
     @app.route('/api/mongo', methods=['POST'])
     def load_charts():
         eqp_id = request.json.get('eqp_id',None)
+        if not isNiceEqp(eqp_id):
+            res_json = {'result': False}
+            return Response(
+                json_util.dumps(res_json),
+                mimetype='application/json'
+            ), 200
         res = list(mongo.db.temperature.find({"eqp_id":eqp_id}).sort("create_time",-1).limit(40))
         if len(res) == 0:
             res_json = {'result':False}
